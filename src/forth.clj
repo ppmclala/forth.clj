@@ -1,5 +1,15 @@
 (ns forth
-  (:import [java.util Scanner]))
+  (:require
+   [clojure.repl :refer [demunge source-fn]])
+  (:import
+   [java.util Scanner]))
+
+(def ^:dynamic *debug* false)
+(defn debug [{:keys [stack dict]}]
+  (when *debug*
+    (println "Current machine: ")
+    (println "\tstack: " @stack)
+    (println "\tdict: " (keys dict))))
 
 (defn next-token [stream]
   (when (. stream hasNext)
@@ -17,11 +27,30 @@
     (swap! ds (fn [s] (rest s)))
     v))
 
-(defn- !peek [ds] (first @ds))
+(defn !peek [ds] (first @ds))
+
+;; the clojure LSP hates this one simple trick! (crashes on :/ keyword)
+(defn translate-token [t] (if (= t (keyword "/")) :DIV t))
 
 (def ^:private native-words
-  {:+ (fn [s _] (!push s (+ (!pop s) (!pop s))))
-   :. (fn [s _] (println (!pop s)))})
+  {:. (fn [s _] (println (!pop s)))
+   :+ (fn [s _] (!push s (+ (!pop s) (!pop s))))
+   :- (fn [s _]
+        (let [*1 (!pop s)
+              *2 (!pop s)]
+          (!push s (- *2 *1))))
+   :* (fn [s _] (!push s (* (!pop s) (!pop s))))
+   :DIV (fn [s _]
+        (let [*1 (!pop s)
+              *2 (!pop s)]
+          (!push s (/ *2 *1))))
+
+   :DUP (fn [s _] (!push s (!peek s)))
+   :SWAP (fn [s _] 
+           (let [*1 (!pop s) 
+                 *2 (!pop s)] 
+             (!push s *1) 
+             (!push s *2)))})
 
 (defn initialize []
   (let [s (Scanner. System/in)
@@ -32,7 +61,7 @@
 
 (defn- unhandled-word [m w]
   (println "Don't know how to handle word " w)
-  (println "Current machine: " (dissoc m :stream)))
+  (debug m))
 
 (defn- evaluate-word [{:keys [stack dict] :as m} w]
   (let [f (get dict w)]
@@ -41,7 +70,7 @@
 (defn forth-eval [{:keys [stack] :as machine} t]
   (if (instance? Long t)
     (!push stack t)
-    (evaluate-word machine t))
+    (evaluate-word machine (translate-token t)))
   machine)
 
 (defn eval-line [machine line]
@@ -53,10 +82,12 @@
 (defn- next-line [{:keys [stream]}] (. stream nextLine))
 
 (defn repl [machine]
-  (print "forth.clj> ")
-  (flush)
-  (let [l (next-line machine)]
-    (repl (eval-line machine l))))
+  (with-bindings {#'*debug* true}
+    (debug machine)
+    (print "forth.clj> ")
+    (flush)
+    (let [l (next-line machine)]
+      (repl (eval-line machine l)))))
 
 (defn -main []
   (repl (initialize)))
@@ -65,20 +96,8 @@
 
   (repl (initialize))
 
-  "1 1 +"
-
-  (first (list 1 2 3))
-  (conj (list 1 2 3) 4)
-
-  (defn foo [x y] (println x y))
-  (apply foo {:a 1 :b 2})
-
-  (def stack* (atom (list)))
-
-  (!push stack* 1)
-  @stack*
-  (!push stack* 2)
-  (!pop stack*)
+  (-> (:+ native-words) .getClass .getName demunge symbol ;;source-fn
+      )
 
   ;;
   )
