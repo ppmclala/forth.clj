@@ -2,11 +2,12 @@
   (:import [java.util Scanner]))
 
 (def ^:dynamic *debug* false)
-(defn debug [{:keys [stack dict]}]
+(defn debug [{:keys [stack dict mode]}]
   (when *debug*
     (println "Current machine: ")
     (println "\tstack: top->" @stack)
-    (println "\tdict:       " (keys @dict))))
+    (println "\tdict:       " (keys @dict))
+    (println "\tmode:       " @mode)))
 
 (defn next-token [stream]
   (when (. stream hasNext)
@@ -26,52 +27,71 @@
 
 (defn !peek [ds] (first @ds))
 
-;; the clojure LSP hates this one simple trick! (crashes on :/ keyword)
-(defn translate-token [t] (if (= t (keyword "/")) :DIV t))
+(defn match-kw [kw t] (= t (keyword kw)))
 
-(def ^:private native-words
-  {:. (fn [s _] (println (!pop s)))
-   :+ (fn [s _] (!push s (+ (!pop s) (!pop s))))
-   :- (fn [s _]
+(defn token->word [t]
+  (condp match-kw t
+    "/" :DIV
+    "(" :BEGIN_COMMENT
+    ")" :END_COMMENT
+    t))
+
+(defn- begin-comment [m] (reset! m :comment))
+(defn- end-comment [m] (reset! m :interpret))
+
+(def native-words
+  {:. (fn [s _ _] (println (!pop s)))
+   :+ (fn [s _ _] (!push s (+ (!pop s) (!pop s))))
+   :- (fn [s _ _]
         (let [*1 (!pop s)
               *2 (!pop s)]
           (!push s (- *2 *1))))
-   :* (fn [s _] (!push s (* (!pop s) (!pop s))))
-   :DIV (fn [s _]
+   :* (fn [s _ _] (!push s (* (!pop s) (!pop s))))
+   :DIV (fn [s _ _]
           (let [*1 (!pop s)
                 *2 (!pop s)]
             (!push s (/ *2 *1))))
 
-   :DUP (fn [s _] (!push s (!peek s)))
-   :SWAP (fn [s _]
+   :DUP (fn [s _ _] (!push s (!peek s)))
+   :SWAP (fn [s _ _]
            (let [*1 (!pop s)
                  *2 (!pop s)]
              (!push s *1 *2)))
-   :ROT (fn [s _]
+   :ROT (fn [s _ _]
           (let [*1 (!pop s)
                 *2 (!pop s)
                 *3 (!pop s)]
-            (!push s *3 *1 *2)))})
+            (!push s *3 *1 *2)))
+   :DROP (fn [s _ _] (!pop s))
+   :BEGIN_COMMENT (fn [_ _ m] (begin-comment m))
+   :END_COMMENT (fn [_ _ m] (end-comment m))})
 
 (defn initialize []
-  (let [s (Scanner. System/in)
-        ds (atom (list))]
-    {:stream s
-     :stack ds
-     :dict (atom native-words)}))
+  {:stream (Scanner. System/in)
+   :stack (atom (list))
+   :mode (atom :interpret) ; maybe :eval?
+   :dict (atom native-words)})
 
 (defn- unhandled-word [m w]
   (println "Don't know how to handle word " w)
   (debug m))
 
-(defn- evaluate-word [{:keys [stack dict] :as m} w]
-  (let [f (get @dict w)]
-    (if f (f stack dict) (unhandled-word m w))))
+(defn- evaluate-word [{:keys [stack dict mode] :as m} w]
+  (case @mode
+    :comment
+    (when (= w :END_COMMENT)
+      (end-comment mode))
+
+    :interpret
+    (let [f (get @dict w)]
+      (if f
+        (f stack dict mode)
+        (unhandled-word m w)))))
 
 (defn forth-eval [{:keys [stack] :as machine} t]
   (if (instance? Long t)
     (!push stack t)
-    (evaluate-word machine (translate-token t)))
+    (evaluate-word machine (token->word t)))
   machine)
 
 (defn eval-line [machine line]
@@ -96,6 +116,14 @@
 (comment
 
   (repl (initialize))
+
+  ;; test case:
+  ;; : SQ ( n -- s ) DUP * ;
+  ;; 2 SQ ;-> 4
+
+  ;; TODO:
+  ;; - [x] implement comments (implies modes during tokenization)
+  ;; - [ ] implment DOCOL (implies compiling mode)
 
   ;;
   )
