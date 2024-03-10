@@ -106,13 +106,10 @@
   (reset! compile-target word)
   (swap! dict assoc word (atom [])))
 
-(defn- compile-word [instructions w]
-  (conj instructions w))
-
 (defn- compile-next [{:keys [compile-target dict]} word]
   (if-not @compile-target
     (set-compile-target compile-target dict word)
-    (swap! (get @dict @compile-target) compile-word word)))
+    (swap! (get @dict @compile-target) conj word)))
 
 (defn- compiled? [h] (= (type h) clojure.lang.Atom))
 (defn- native? [h] (fn? h))
@@ -122,7 +119,6 @@
         code-word (get @dict next-word)]
 
     (cond
-
       (compiled? code-word)
       ;; code-word is a vector of instructions (wrapped in an Atom)
       (do
