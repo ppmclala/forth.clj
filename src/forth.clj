@@ -1,15 +1,12 @@
 (ns forth
-  (:require
-   [clojure.repl :refer [demunge source-fn]])
-  (:import
-   [java.util Scanner]))
+  (:import [java.util Scanner]))
 
 (def ^:dynamic *debug* false)
 (defn debug [{:keys [stack dict]}]
   (when *debug*
     (println "Current machine: ")
-    (println "\tstack: " @stack)
-    (println "\tdict: " (keys dict))))
+    (println "\tstack: top->" @stack)
+    (println "\tdict:       " (keys @dict))))
 
 (defn next-token [stream]
   (when (. stream hasNext)
@@ -19,8 +16,8 @@
         (catch Exception _
           (keyword raw-token))))))
 
-(defn !push [ds token]
-  (swap! ds (fn [s t] (conj s t)) token))
+(defn !push [ds & tokens]
+  (swap! ds (fn [s t] (apply conj s t)) tokens))
 
 (defn !pop [ds]
   (let [v (first @ds)]
@@ -41,30 +38,34 @@
           (!push s (- *2 *1))))
    :* (fn [s _] (!push s (* (!pop s) (!pop s))))
    :DIV (fn [s _]
-        (let [*1 (!pop s)
-              *2 (!pop s)]
-          (!push s (/ *2 *1))))
+          (let [*1 (!pop s)
+                *2 (!pop s)]
+            (!push s (/ *2 *1))))
 
    :DUP (fn [s _] (!push s (!peek s)))
-   :SWAP (fn [s _] 
-           (let [*1 (!pop s) 
-                 *2 (!pop s)] 
-             (!push s *1) 
-             (!push s *2)))})
+   :SWAP (fn [s _]
+           (let [*1 (!pop s)
+                 *2 (!pop s)]
+             (!push s *1 *2)))
+   :ROT (fn [s _]
+          (let [*1 (!pop s)
+                *2 (!pop s)
+                *3 (!pop s)]
+            (!push s *3 *1 *2)))})
 
 (defn initialize []
   (let [s (Scanner. System/in)
         ds (atom (list))]
     {:stream s
      :stack ds
-     :dict native-words}))
+     :dict (atom native-words)}))
 
 (defn- unhandled-word [m w]
   (println "Don't know how to handle word " w)
   (debug m))
 
 (defn- evaluate-word [{:keys [stack dict] :as m} w]
-  (let [f (get dict w)]
+  (let [f (get @dict w)]
     (if f (f stack dict) (unhandled-word m w))))
 
 (defn forth-eval [{:keys [stack] :as machine} t]
@@ -95,9 +96,6 @@
 (comment
 
   (repl (initialize))
-
-  (-> (:+ native-words) .getClass .getName demunge symbol ;;source-fn
-      )
 
   ;;
   )
