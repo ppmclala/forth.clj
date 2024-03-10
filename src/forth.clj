@@ -1,13 +1,13 @@
 (ns forth
   (:import [java.util Scanner]))
 
-(defn !push [ds & tokens]
+(defn- !push [ds & tokens]
   (swap! ds (fn [s t] (apply conj s t)) tokens))
 
-(defn !pop [ds]
-  (let [v (first @ds)] (swap! ds (fn [s] (rest s))) v))
+(defn- !peek [ds] (first @ds))
 
-(defn !peek [ds] (first @ds))
+(defn- !pop [ds]
+  (let [v (!peek ds)] (swap! ds (fn [s] (rest s))) v))
 
 (defn- begin-comment [m] (reset! m :comment))
 (defn- end-comment [m] (reset! m :interpret))
@@ -83,12 +83,9 @@
   (println "Dictionary:\n\tdict:       " (keys @dict)))
 
 (defn next-token [stream]
-  (when (. stream hasNext)
-    (let [raw-token (. stream next)]
-      (try
-        (Long/parseLong raw-token)
-        (catch Exception _
-          (keyword raw-token))))))
+  (cond
+    (. stream hasNextBigInteger) (. stream nextBigInteger)
+    (. stream hasNext) (keyword (. stream next))))
 
 (defn- match-kw [kw t] (= t (keyword kw)))
 
@@ -156,7 +153,7 @@
       (compile-next m w))))
 
 (defn- forth-eval [{:keys [stack] :as machine} t]
-  (if (instance? Long t)
+  (if (instance? BigInteger t)
     (!push stack t)
     (next-word machine (token->word t)))
   machine)
