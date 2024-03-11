@@ -68,16 +68,14 @@
    :EXIT
    (fn [_ _ m] (stop-compiling m))})
 
-(def ^:dynamic *debug* false)
-(defn debug [{:keys [stack mode dict compile-target]}]
-  (when *debug*
-    (println "Current machine: ")
-    (println "\tstack:      top->" @stack)
-    (println "\tmode:            " @mode)
-    (when (= :compile @mode)
-      (let [instrs (get @dict @compile-target)]
-        (println "\tcompile-target:  " @compile-target)
-        (println "\tinstructions:    " (when instrs @instrs))))))
+(defn inspect [{:keys [stack mode dict compile-target]}]
+  (println "Current machine: ")
+  (println "\tstack:      top->" @stack)
+  (println "\tmode:            " @mode)
+  (when (= :compile @mode)
+    (let [instrs (get @dict @compile-target)]
+      (println "\tcompile-target:  " @compile-target)
+      (println "\tinstructions:    " (when instrs @instrs)))))
 
 (defn print-dict [{:keys [dict]}]
   (println "Dictionary:\n\tdict:       " (keys @dict)))
@@ -168,14 +166,13 @@
    :dict (atom dictionary)})
 
 (defn repl [{:keys [stream] :as machine}]
-  (with-bindings {#'*debug* true}
-    (debug machine)
-    (print "forth.clj> ")
-    (flush)
-    (->> 
-      (. stream nextLine)
-      (eval-line machine)
-      repl)))
+  (inspect machine)
+  (print "forth.clj> ")
+  (flush)
+  (->>
+   (. stream nextLine)
+   (eval-line machine)
+   repl))
 
 (defn -main []
   (repl (initialize)))
