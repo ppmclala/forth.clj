@@ -160,8 +160,6 @@
            t (next-token scanner)]
       (if t (recur (forth-eval m t) (next-token scanner)) m))))
 
-(defn- next-line [{:keys [stream]}] (. stream nextLine))
-
 (defn initialize []
   {:stream (Scanner. System/in)
    :stack (atom (list))
@@ -169,13 +167,15 @@
    :compile-target (atom nil)
    :dict (atom dictionary)})
 
-(defn repl [machine]
+(defn repl [{:keys [stream] :as machine}]
   (with-bindings {#'*debug* true}
     (debug machine)
     (print "forth.clj> ")
     (flush)
-    (let [l (next-line machine)]
-      (repl (eval-line machine l)))))
+    (->> 
+      (. stream nextLine)
+      (eval-line machine)
+      repl)))
 
 (defn -main []
   (repl (initialize)))
