@@ -19,59 +19,70 @@
 ;; intrinsics
 (def dictionary
   {:.
-   (fn [s _ _] (println (!pop s)))
+   (fn [s _ _ _] (println (!pop s)))
 
    :+
-   (fn [s _ _] (!push s (+ (!pop s) (!pop s))))
+   (fn [s _ _ _] (!push s (+ (!pop s) (!pop s))))
 
    :-
-   (fn [s _ _]
+   (fn [s _ _ _]
      (let [*1 (!pop s)
            *2 (!pop s)]
        (!push s (- *2 *1))))
    :*
-   (fn [s _ _] (!push s (* (!pop s) (!pop s))))
+   (fn [s _ _ _] (!push s (* (!pop s) (!pop s))))
 
    :DIV
-   (fn [s _ _]
+   (fn [s _ _ _]
      (let [*1 (!pop s)
            *2 (!pop s)]
-       (!push s (/ *2 *1))))
+       (!push s (quot *2 *1))))
 
    :DUP
-   (fn [s _ _] (!push s (!peek s)))
+   (fn [s _ _ _] (!push s (!peek s)))
 
    :SWAP
-   (fn [s _ _]
+   (fn [s _ _ _]
      (let [*1 (!pop s)
            *2 (!pop s)]
        (!push s *1 *2)))
 
    :ROT
-   (fn [s _ _]
+   (fn [s _ _ _]
      (let [*1 (!pop s)
            *2 (!pop s)
            *3 (!pop s)]
        (!push s *3 *1 *2)))
    :DROP
-   (fn [s _ _] (!pop s))
+   (fn [s _ _ _] (!pop s))
 
    :BEGIN_COMMENT
-   (fn [_ _ m] (begin-comment m))
+   (fn [_ _ m _] (begin-comment m))
 
    :END_COMMENT
-   (fn [_ _ m] (end-comment m))
+   (fn [_ _ m _] (end-comment m))
 
    :DOCOL
-   (fn [_ _ m] (start-compiling m))
+   (fn [_ _ m _] (start-compiling m))
 
    :EXIT
-   (fn [_ _ m] (stop-compiling m))})
+   (fn [_ _ m _] (stop-compiling m))
+   
+   :!
+   (fn [s _ m mem] 
+     (let [val (!pop s)
+           addr (!pop s)]
+       (swap! mem assoc addr val)))
+   
+   :AT
+   (fn [s _ _ mem] 
+     (->> (!pop s) (get @mem) (!push s)))})
 
-(defn inspect [{:keys [stack mode dict compile-target]}]
+(defn inspect [{:keys [stack mode dict memory compile-target]}]
   (println "Current machine: ")
   (println "\tstack:      top->" @stack)
   (println "\tmode:            " @mode)
+  (println "\tmemory:          " @memory)
   (when (= :compile @mode)
     (let [instrs (get @dict @compile-target)]
       (println "\tcompile-target:  " @compile-target)
@@ -94,6 +105,7 @@
     ")" :END_COMMENT
     ":" :DOCOL
     ";" :EXIT
+    "@" :AT
     t))
 
 (defn- unhandled-word [m w]
@@ -112,7 +124,7 @@
 (defn- compiled? [h] (= (type h) clojure.lang.Atom))
 (defn- native? [h] (fn? h))
 
-(defn- exec-instrs* [{:keys [dict stack mode] :as m} instrs]
+(defn- exec-instrs* [{:keys [dict stack mode memory] :as m} instrs]
   (let [next-word (first instrs)
         code-word (get @dict next-word)]
 
@@ -126,7 +138,7 @@
       (native? code-word)
       ;; code-word is a fn
       (do
-        (code-word stack dict mode)
+        (code-word stack dict mode memory)
         (exec-instrs* m (rest instrs)))
 
       (some? next-word)
@@ -163,7 +175,8 @@
    :stack (atom (list))
    :mode (atom :interpret) ; maybe :eval?
    :compile-target (atom nil)
-   :dict (atom dictionary)})
+   :dict (atom dictionary)
+   :memory (atom {})})
 
 (defn repl [{:keys [stream] :as machine}]
   (inspect machine)
