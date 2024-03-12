@@ -16,27 +16,36 @@
   (reset! mode :interpret)
   (reset! compile-target nil))
 
+(defn binop [s op]
+  (let [*1 (!pop s)
+        *2 (!pop s)]
+    (!push s (op *2 *1))))
+
+(defn test [s c] 
+  (let [*1 (!pop s)
+        *2 (!pop s)]
+    (!push s (if (c *2 *1) -1 0))))
+
 ;; intrinsics
 (def dictionary
   {:.
    (fn [s _ _ _] (println (!pop s)))
 
    :+
-   (fn [s _ _ _] (!push s (+ (!pop s) (!pop s))))
+   (fn [s _ _ _] (binop s +))
 
    :-
-   (fn [s _ _ _]
-     (let [*1 (!pop s)
-           *2 (!pop s)]
-       (!push s (- *2 *1))))
-   :*
-   (fn [s _ _ _] (!push s (* (!pop s) (!pop s))))
+   (fn [s _ _ _] (binop s -))
 
-   :DIV
+   :*
+   (fn [s _ _ _] (binop s *))
+
+   :MOD
    (fn [s _ _ _]
      (let [*1 (!pop s)
            *2 (!pop s)]
-       (!push s (quot *2 *1))))
+       (!push s (mod *2 *1)) ; remainder
+       (!push s (quot *2 *1)))) ; quotient
 
    :DUP
    (fn [s _ _ _] (!push s (!peek s)))
@@ -82,7 +91,22 @@
    (fn [s _ _ mem]
      (let [addr (!pop s)
            val (!pop s)]
-       (swap! mem update addr + val)))})
+       (swap! mem update addr + val)))
+   
+   :<
+   (fn [s _ _ _] (test s <))
+     
+   :>
+   (fn [s _ _ _] (test s >))
+
+   :=
+   (fn [s _ _ _] (test s -))
+
+   :>=
+   (fn [s _ _ _] (test s >=))
+
+   :<=
+   (fn [s _ _ _] (test s <=))})
 
 (defn inspect [{:keys [stack mode dict memory compile-target]}]
   (println "Current machine: ")
@@ -106,7 +130,6 @@
 
 (defn- token->word [t]
   (condp match-kw t
-    "/" :DIV
     "(" :BEGIN_COMMENT
     ")" :END_COMMENT
     ":" :DOCOL
@@ -179,6 +202,7 @@
 (defn initialize []
   {:stream (Scanner. System/in)
    :stack (atom (list))
+   :rstack (atom (list))
    :mode (atom :interpret) ; maybe :eval?
    :compile-target (atom nil)
    :dict (atom dictionary)
@@ -199,6 +223,8 @@
 (comment
 
   (repl (initialize))
+
+  ;; 4 3 > if 9 else 0 end
 
   ;;
   )
