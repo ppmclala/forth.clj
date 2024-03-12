@@ -69,14 +69,20 @@
    (fn [_ _ m _] (stop-compiling m))
    
    :!
-   (fn [s _ m mem] 
-     (let [val (!pop s)
-           addr (!pop s)]
+   (fn [s _ _ mem] 
+     (let [addr (!pop s)
+           val (!pop s)]
        (swap! mem assoc addr val)))
    
    :AT
    (fn [s _ _ mem] 
-     (->> (!pop s) (get @mem) (!push s)))})
+     (->> (!pop s) (get @mem) (!push s)))
+   
+   :+!
+   (fn [s _ _ mem]
+     (let [addr (!pop s)
+           val (!pop s)]
+       (swap! mem update addr + val)))})
 
 (defn inspect [{:keys [stack mode dict memory compile-target]}]
   (println "Current machine: ")
