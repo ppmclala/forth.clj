@@ -21,7 +21,7 @@
         *2 (!pop s)]
     (!push s (op *2 *1))))
 
-(defn test [s c] 
+(defn compop [s c] 
   (let [*1 (!pop s)
         *2 (!pop s)]
     (!push s (if (c *2 *1) -1 0))))
@@ -94,19 +94,19 @@
        (swap! mem update addr + val)))
    
    :<
-   (fn [s _ _ _] (test s <))
+   (fn [s _ _ _] (compop s <))
      
    :>
-   (fn [s _ _ _] (test s >))
+   (fn [s _ _ _] (compop s >))
 
    :=
-   (fn [s _ _ _] (test s -))
+   (fn [s _ _ _] (compop s -))
 
    :>=
-   (fn [s _ _ _] (test s >=))
+   (fn [s _ _ _] (compop s >=))
 
    :<=
-   (fn [s _ _ _] (test s <=))})
+   (fn [s _ _ _] (compop s <=))})
 
 (defn inspect [{:keys [stack mode dict memory compile-target]}]
   (println "Current machine: ")
