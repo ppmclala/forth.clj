@@ -21,7 +21,7 @@
         *2 (!pop s)]
     (!push s (op *2 *1))))
 
-(defn compop [s c] 
+(defn compop [s c]
   (let [*1 (!pop s)
         *2 (!pop s)]
     (!push s (if (c *2 *1) -1 0))))
