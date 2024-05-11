@@ -76,26 +76,26 @@
 
    :EXIT
    (fn [_ _ m _] (stop-compiling m))
-   
+
    :!
-   (fn [s _ _ mem] 
+   (fn [s _ _ mem]
      (let [addr (!pop s)
            val (!pop s)]
        (swap! mem assoc addr val)))
-   
+
    :AT
-   (fn [s _ _ mem] 
+   (fn [s _ _ mem]
      (->> (!pop s) (get @mem) (!push s)))
-   
+
    :+!
    (fn [s _ _ mem]
      (let [addr (!pop s)
            val (!pop s)]
        (swap! mem update addr + val)))
-   
+
    :<
    (fn [s _ _ _] (compop s <))
-     
+
    :>
    (fn [s _ _ _] (compop s >))
 
@@ -206,6 +206,7 @@
    :mode (atom :interpret) ; maybe :eval?
    :compile-target (atom nil)
    :dict (atom dictionary)
+   ;; memory is addressable instructions
    :memory (atom {})})
 
 (defn repl [{:keys [stream] :as machine}]
